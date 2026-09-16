@@ -45,7 +45,12 @@ TOOL_GUIDANCE = (
     "- Prefer the dedicated tools (read, edit, grep, glob, and similar) over "
     "shelling out to generic commands; they are safer and cheaper to run.\n"
     "- When several read-only tool calls are independent of each other, call "
-    "them in parallel in the same turn rather than one at a time."
+    "them in parallel in the same turn rather than one at a time.\n"
+    "- Shell commands already run in the project directory; do not prefix them "
+    "with cd. Keep commands simple: one command per call, no shell loops, no "
+    "git stash. The lint and test commands listed under Environment are run by "
+    "the harness after edits and before a turn may end, so you rarely need to "
+    "run them yourself."
 )
 
 TONE = (

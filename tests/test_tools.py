@@ -433,3 +433,12 @@ def test_enforce_aggregate_budget_persists_largest_first(ctx: ToolContext) -> No
     # The small one should be untouched.
     assert out[2].content == small
     assert out[2].persisted_path is None
+
+
+def test_stderr_redirect_does_not_make_command_non_read_only():
+    from open_harness.tools.shell import command_is_read_only
+
+    assert command_is_read_only("head -5 a.txt b.txt 2>&1")
+    assert command_is_read_only("ls 2>/dev/null | wc -l")
+    assert not command_is_read_only("ls > out.txt")
+    assert not command_is_read_only("cat a.txt >> b.txt 2>&1")

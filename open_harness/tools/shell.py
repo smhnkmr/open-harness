@@ -44,7 +44,9 @@ def _split_segments(command: str) -> list[str]:
 
 
 def _segment_is_read_only(segment: str) -> bool:
-    if ">" in segment:  # covers both > and >>
+    # `2>&1` and `2>/dev/null` only reroute stderr; they write nothing.
+    stripped = re.sub(r"\d?>&\d|\d>\s*/dev/null|2>\s*NUL\b", "", segment)
+    if ">" in stripped:  # covers both > and >>
         return False
     try:
         tokens = shlex.split(segment)
