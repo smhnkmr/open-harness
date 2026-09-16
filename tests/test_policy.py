@@ -452,3 +452,12 @@ def test_pytest_node_id_is_not_an_alternate_data_stream() -> None:
     req = ToolCallRequest(tool_name="shell", args={"command": cmd}, permission_content=cmd,
                           is_read_only=False, is_destructive=False)
     assert immune_check(req, "C:/tmp") is None
+
+
+def test_dot_relative_path_is_not_a_trailing_dot_pattern() -> None:
+    from open_harness.policy.safety import immune_check
+
+    p = "./open_harness/kernel/loop.py"
+    req = ToolCallRequest(tool_name="read", args={"file_path": p}, permission_content=p,
+                          is_read_only=True, is_destructive=False, paths=[p])
+    assert immune_check(req, os.getcwd()) is None

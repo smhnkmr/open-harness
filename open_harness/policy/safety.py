@@ -149,7 +149,7 @@ def _windows_suspicious(raw: str) -> str | None:
     if re.search(r"~\d", s):
         return "8.3 short filename"
 
-    parts = [p for p in re.split(r"[\\/]+", s) if p]
+    parts = [p for p in re.split(r"[\\/]+", s) if p and p not in (".", "..")]
     for part in parts:
         if _DEVICE_NAMES.match(part):
             return f"reserved device name '{part}'"

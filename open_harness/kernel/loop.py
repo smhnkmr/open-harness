@@ -289,7 +289,7 @@ class Session:
         if not self.config.verify.lint:
             return
         errors = run_lint(self.backend, path, self.config.verify, self.cwd)
-        self.log.append("verifier_result", stage="lint", file=path, ok=not errors)
+        self.log.append("verifier_result", stage="lint", file=path, ok=not errors, detail=errors[:2000])
         if errors and isinstance(result.content, str):
             result.content += "\n\n" + errors
 

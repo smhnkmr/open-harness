@@ -132,3 +132,19 @@ def test_run_gate_never_raises_on_backend_exception() -> None:
     result = run_gate(backend, VerifyConfig(test="pytest -q"), "/cwd")
     assert result.ok is False
     assert "no shell" in result.failures
+
+
+def test_run_lint_quotes_and_forward_slashes_the_file(tmp_path):
+    from open_harness.config import VerifyConfig
+    from open_harness.verify.gate import run_lint
+
+    seen = {}
+
+    class B:
+        def execute(self, cmd, *, timeout, env=None, cwd=None):
+            seen["cmd"] = cmd
+            from open_harness.backend.base import ExecResult
+            return ExecResult(stdout="", stderr="", exit_code=0)
+
+    run_lint(B(), r"open_harness\kernel\events.py", VerifyConfig(lint="ruff check {file}"), tmp_path)
+    assert seen["cmd"] == 'ruff check "open_harness/kernel/events.py"'

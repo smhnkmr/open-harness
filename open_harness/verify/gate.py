@@ -32,7 +32,10 @@ def run_lint(backend: Backend, file: str, cfg: VerifyConfig, cwd: str | Path) ->
     of stderr (or stdout if stderr is empty)."""
     if not cfg.lint:
         return ""
-    cmd = cfg.lint.replace("{file}", file)
+    # The command runs through a shell (bash on Windows too); a backslash path
+    # would be eaten as escapes. Use forward slashes and quote it.
+    safe_file = str(file).replace("\\", "/")
+    cmd = cfg.lint.replace("{file}", f'"{safe_file}"')
     try:
         result = backend.execute(cmd, timeout=_LINT_TIMEOUT_SECONDS, cwd=_as_path(cwd))
     except Exception as exc:  # noqa: BLE001 - verification must never raise
