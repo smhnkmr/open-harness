@@ -86,7 +86,11 @@ def immune_check(
                 immune=True,
             )
 
-        if _escapes_roots(raw, cwd, additional_dirs):
+        # Containment applies to file tools only. A shell command legitimately
+        # names programs outside the project (interpreters, venvs, anything on
+        # PATH), so for shell we check dangerous names and patterns above but
+        # not containment. Where a shell command writes is governed by rules.
+        if req.tool_name != "shell" and _escapes_roots(raw, cwd, additional_dirs):
             return Decision(
                 behavior="ask",
                 reason=f"path resolves outside the working directory: {raw}",

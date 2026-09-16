@@ -217,7 +217,7 @@ class TerminalClient:
 
     def _on_provider_error(self, record: dict[str, Any]) -> None:
         message = str(record.get("message", ""))[:120]
-        self._line(f"  ! {record.get('kind')}: {message} (attempt {record.get('attempt')})", style="yellow")
+        self._line(f"  ! {record.get('error_kind')}: {message} (attempt {record.get('attempt')})", style="yellow")
 
     def _on_usage(self, record: dict[str, Any]) -> None:
         for key in self._turn_usage:

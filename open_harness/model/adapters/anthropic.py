@@ -10,7 +10,7 @@ event maps 1:1 onto the neutral `Event` union with no hidden accumulation.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, ClassVar
 
 import anthropic
 
@@ -93,17 +93,32 @@ class AnthropicAdapter(Adapter):
         if req.stop_sequences:
             payload["stop_sequences"] = req.stop_sequences
         if req.thinking is not None and req.thinking.enabled:
-            budget = req.thinking.budget_tokens or _DEFAULT_THINKING_BUDGET
-            payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
-            payload["max_tokens"] = max(payload["max_tokens"], budget + 1)
+            if model in self._adaptive_models:
+                # Newer models reject a fixed budget and require adaptive thinking.
+                payload["thinking"] = {"type": "adaptive"}
+            else:
+                budget = req.thinking.budget_tokens or _DEFAULT_THINKING_BUDGET
+                payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
+                payload["max_tokens"] = max(payload["max_tokens"], budget + 1)
         return payload
+
+    _adaptive_models: ClassVar[set[str]] = set()   # learned per process: models needing thinking.type=adaptive
+
+    def _create_stream(self, model: str, req: ModelRequest):
+        """Create the SDK stream, switching to adaptive thinking once if the API asks for it."""
+        try:
+            return self._client().messages.create(**self.build_payload(model, req), stream=True)
+        except Exception as exc:
+            if "thinking.type.adaptive" in str(exc) and model not in self._adaptive_models:
+                self._adaptive_models.add(model)
+                return self._client().messages.create(**self.build_payload(model, req), stream=True)
+            raise
 
     # ------------------------------------------------------------------ stream
 
     def stream(self, model: str, req: ModelRequest) -> Iterator[Event]:
         try:
-            payload = self.build_payload(model, req)
-            raw_stream = self._client().messages.create(**payload, stream=True)
+            raw_stream = self._create_stream(model, req)
         except Exception as exc:  # noqa: BLE001 - never raise out of stream()
             yield map_provider_exception(exc)
             return

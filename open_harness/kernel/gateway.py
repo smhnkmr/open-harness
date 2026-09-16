@@ -87,7 +87,7 @@ class Gateway:
             except ProviderErrorRaised as raised:
                 err = raised.error
                 last = err
-                self.on_event("provider_error", {"kind": err.kind, "message": err.message[:500],
+                self.on_event("provider_error", {"error_kind": err.kind, "message": err.message[:500],
                                                  "attempt": attempt, "retryable": err.retryable})
                 if err.kind == "context_too_long":
                     raise ContextTooLong(err, attempt) from None

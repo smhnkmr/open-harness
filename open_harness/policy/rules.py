@@ -157,9 +157,22 @@ def shell_fully_allowed(req: ToolCallRequest, cwd: str, allow_rules: list[Rule])
             is_destructive=req.is_destructive,
             paths=req.paths,
         )
-        if not any(matches(r, seg_req, cwd) for r in allow_rules):
-            return False
+        if any(matches(r, seg_req, cwd) for r in allow_rules):
+            continue
+        if _segment_is_read_only(seg):
+            # A known read-only filter such as `| tail -40` or `| grep x` never
+            # needs its own rule; only the segments that can change state do.
+            continue
+        return False
     return True
+
+
+def _segment_is_read_only(segment: str) -> bool:
+    try:
+        from open_harness.tools.shell import _segment_is_read_only as check
+    except ImportError:  # pragma: no cover - tools package always present
+        return False
+    return check(segment)
 
 
 def path_under(path: str, root: str) -> bool:

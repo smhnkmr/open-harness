@@ -407,3 +407,39 @@ def test_reducer_immune_ask_never_auto_allowed_at_stage1(tmp_path: Path) -> None
 
 def test_fixed_repo_commands_set_contains_git_status() -> None:
     assert "git status" in FIXED_REPO_COMMANDS
+
+
+def test_shell_command_naming_program_outside_cwd_is_not_immune(tmp_path: Path) -> None:
+    """A shell command may name an interpreter outside the project (spec 8.5 applies
+    containment to file tools only). Regression for the live run that denied
+    `<venv>/python.exe -m pytest` as a protected path."""
+    from open_harness.policy.safety import immune_check
+
+    exe = "C:/somewhere/else/.venv/Scripts/python.exe" if str(tmp_path).startswith("C:") else "/usr/local/bin/python3"
+    req = ToolCallRequest(tool_name="shell", args={"command": f"{exe} -m pytest -q"},
+                          permission_content=f"{exe} -m pytest -q", is_read_only=False, is_destructive=False)
+    assert immune_check(req, str(tmp_path)) is None
+
+
+def test_read_outside_cwd_is_still_immune(tmp_path: Path) -> None:
+    from open_harness.policy.safety import immune_check
+
+    outside = str(tmp_path.parent / "elsewhere.txt")
+    req = ToolCallRequest(tool_name="read", args={"file_path": outside}, permission_content=outside,
+                          is_read_only=True, is_destructive=False, paths=[outside])
+    d = immune_check(req, str(tmp_path / "proj"))
+    assert d is not None and d.immune
+
+
+def test_compound_allowed_when_extra_segments_are_read_only_filters() -> None:
+    """`<allowed cmd> 2>&1 | tail -40` needs no rule for `tail` (regression from the
+    live comparison run where Claude Code allowed the same shape)."""
+    from open_harness.policy.rules import shell_fully_allowed
+
+    rules = [parse_rule("shell(python*)", "allow", "user")]
+    ok = ToolCallRequest(tool_name="shell", args={}, permission_content="python -m pytest -q 2>&1 | tail -40",
+                         is_read_only=False, is_destructive=False)
+    bad = ToolCallRequest(tool_name="shell", args={}, permission_content="python -m pytest -q && rm -rf build",
+                          is_read_only=False, is_destructive=False)
+    assert shell_fully_allowed(ok, "C:/tmp", rules)
+    assert not shell_fully_allowed(bad, "C:/tmp", rules)
