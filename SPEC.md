@@ -1,6 +1,6 @@
 # open-harness: design and specification
 
-Status: living document. Version 0.3, 16 September 2026. Section 18 records what is built and what comes next.
+Status: living document. Version 0.4, 16 September 2026. Section 18 records what is built and what comes next; §18.4 records the decision not to build on Google ADK.
 Origin: synthesised from source reading of Claude Code, opencode, Codex CLI, browser-use, Gemini CLI, OpenHands, Deep Agents and LangChain, plus Anthropic's published harness guidance. Companion explainer pages exist for each; this file is the normative record.
 
 Conventions: MUST, SHOULD and MAY are used in the RFC sense. Anything marked `[open]` is undecided. Anything marked `[expires]` is a guard that must carry a reason and a model version and be re-tested at each model release.
@@ -497,6 +497,8 @@ Types: `command` (bash or powershell, sync or async), `prompt` (small model), `a
 
 Contract: JSON on stdin; JSON or text on stdout; exit 0 success, exit 2 blocking with stderr to the model, other codes non-blocking. All hooks for an event run in parallel with individual timeouts, ten minutes default, 1.5 s for `SessionEnd`. Managed settings MAY restrict to managed hooks only.
 
+In-process hook API: where an event coincides with a Google ADK plugin callback (`before_model`, `after_model`, `before_tool`, `after_tool`, `before_agent`, `after_agent`, `on_event`, `on_tool_error`, `on_model_error`) the Python name SHOULD match it, so a hook written against ADK's shape ports with a rename. A `before_tool` hook MAY return a substitute result, which short-circuits the call and is logged as such. This is a naming convention, not a dependency on ADK.
+
 ### 11.2 Skills
 
 Directory with `SKILL.md` and frontmatter: name, description, user-invocable, model or role, allowed-tools, arguments, when-to-use, disable-model-invocation, hooks, fork. Only name, description and when-to-use enter the prompt until invoked. Bundled skills MAY extract reference files to disk on first use.
@@ -525,7 +527,7 @@ Clients push ops and read events. Any socket transport MUST be authenticated; th
 
 ### 12.2 Surfaces
 
-Terminal UI, headless with `text | json | stream-json` output and a stream-json control channel over stdio, IDE via lock-file discovery and an MCP connection, web and mobile via an authenticated bridge that spawns child sessions, and an SDK. All are thin.
+Terminal UI, headless with `text | json | stream-json` output and a stream-json control channel over stdio, IDE via lock-file discovery and an MCP connection, web and mobile via an authenticated bridge that spawns child sessions, an SDK, and an A2A server that exposes a session as an Agent2Agent task endpoint so orchestrators built on other frameworks can call open-harness as one agent. All are thin. The A2A surface is planned after the terminal and headless surfaces are stable (§18.2).
 
 The terminal renders every log record through a listener, so the screen and the transcript are the same data. Its approval prompt offers allow once, allow always, deny, and deny with a message that reaches the model. A line typed at the prompt that is clearly a next instruction is queued for the next turn rather than dropped. In one-shot mode approvals fail closed and are logged.
 
@@ -557,6 +559,8 @@ At each model release, an outer agent edits the surfaces for that model's profil
 ### 14.3 Evals
 
 Two suites: diagnostic unit evals that each assert one behaviour, and a holistic battery across autonomous terminal tasks, conversation with a simulated user, context retrieval and research. The harness variant (`bare` versus `product`) is an explicit input alongside the model. Scores are `pass@k` and `avg@k` over at least three rollouts. Intermittent tasks are kept because they discriminate.
+
+Case format: eval cases are stored as Google ADK `EvalSet` JSON (eval set, eval cases, conversation turns with expected tool trajectory and final response) so the same cases run under `adk eval` unchanged. Tool-trajectory scoring follows ADK's metric definitions where they exist (`TOOL_TRAJECTORY_AVG_SCORE`, `FINAL_RESPONSE_MATCH_V2`); harness-specific measures (API calls, cost per role, denials, files touched outside scope, verifier retries) are extra fields the driver adds. The format is borrowed; the driver and runners are ours.
 
 ---
 
@@ -591,6 +595,8 @@ Two suites: diagnostic unit evals that each assert one behaviour, and a holistic
 
 Source readings, September 2026: Claude Code (local snapshot), opencode, OpenAI Codex CLI, browser-use, Google Gemini CLI, OpenHands and its SDK, LangChain Deep Agents and dcode, LangChain core and partner packages. Published guidance: Anthropic on building effective agents, context engineering, long-running harnesses and managed agents; SWE-agent on agent-computer interfaces; Cursor and LangChain on harness engineering.
 
+Google ADK (Python v2.9.1, September 2026): studied as a candidate foundation rather than as a source of design, see §18.4. Companion page: "Should open-harness Build on ADK?" Evidence read: adk-python source (flows, plugins, models, compaction, resumability, code executors), adk.dev 2.0 notes, adk-python issues #265, #994, #3289, #3828, #4482, #4801, #7004, litellm issues #18950, #25561, #29491, allenporter/adk-coder, adk-samples software-bug-assistant, gemini-cli issue #8256, Google's May 2026 post on pause-and-resume agents, Simon Willison on how coding agents work, Addy Osmani on agent harness engineering.
+
 ## 18. Implementation status and roadmap
 
 Status as of 16 September 2026, against the prototype at https://github.com/smhnkmr/open-harness.
@@ -619,8 +625,13 @@ Three live comparisons against Claude Code (a bug fix, a five-turn conversation,
 5. **Harness profiles.** The registry from §5.6. First entry: the Sonnet guidance lines from §9.1, with reason and date.
 6. **Multi-vendor live.** `explore` on a local Ollama model, `classifier` on a small OpenAI model, eval suite across three vendors.
 7. **Classifier stage** of the ask reducer (§8.4 stage 2).
+8. **A2A server surface** (§12.2): one session per A2A task, events mapped to task status updates, approvals surfaced as input-required states.
+
+Step 1 stores its cases in the ADK `EvalSet` format (§14.3) from the first commit, so no migration is needed later. Step 5's hook names follow §11.1.
 
 Deferred until those are done: sub-agents and forks, memory with hashed citations, compaction tiers one and two, OS sandbox, MCP, hooks, remaining stream-json ops.
+
+Re-check triggers. The ADK decision in §18.4 is revisited if either becomes true: ADK exposes a public injection point for the LLM flow (today `LlmAgent._llm_flow` is private), or the Anthropic-path issues for thinking with tool use and streamed tool arguments close on both adk-python and litellm. Each is checkable in an afternoon.
 
 ### 18.3 Comparison record
 
@@ -632,8 +643,15 @@ Deferred until those are done: sub-agents and forks, memory with hashed citation
 
 Defects found by these tests, all fixed: child stdin inheritance hang; TOML key ordering; one-shot approvals blocking; console encoding; shell containment on interpreter paths; `::` and `./` false positives; `2>&1` treated as a write; lint path unquoted in bash; provider-error log key collision; adaptive thinking; interpreter not on PATH; prompts swallowed at approval; bare `[stderr]` rendering.
 
+### 18.4 Decision: not built on Google ADK
+
+Assessed 16 September 2026 against ADK Python v2.9.1. Twenty spec requirements were mapped to ADK primitives: three native (event log, evals, MCP and A2A), nine partial, three in conflict, five absent. The conflicts are the kernel: ADK's tool loop is selected by a private property and turn end is decided by `is_final_response()`, its canonical message type is Gemini's `Content`/`Part` with every other vendor converted, and its model classes branch on provider name, which P8 forbids. The absences are the verifier gate, the independent evaluator, coding tools, the guard registry and secrets substitution. Field evidence: no mature coding harness has shipped on ADK, Gemini CLI does not use it, the one attempt (adk-coder) wrote its own permission engine, and Claude through ADK has open issues for thinking with tool use, streamed tool arguments and cache control.
+
+Decision: keep the kernel; adopt the `EvalSet` format (§14.3), the plugin callback names (§11.1) and an A2A surface (§12.2). No runtime dependency on ADK. An ADK-backed model adapter (wrapping `BaseLlm` classes) is possible in a few hundred lines but is not planned, because it would re-import the LiteLLM streaming bugs the native adapters avoid.
+
 ## 19. Changelog
 
+- 0.4, 2026-09-16: Google ADK assessed and declined as a foundation (§18.4); eval cases adopt the ADK `EvalSet` format (§14.3); in-process hook names follow ADK's plugin callbacks (§11.1); A2A server added as a planned surface (§12.2) and roadmap step 8; re-check triggers recorded.
 - 0.3, 2026-09-16: implementation status and roadmap added; rules for compound commands, stderr redirects and shell containment; environment block names interpreter and verify commands; terminal pending-input queue. Nine live-found defects fixed.
 - 0.2, 2026-09-16: terminal client with approval prompts; session-scoped rules and mode changes recorded in the log and replayed on resume; deny-with-message reaches the model; gateway streams text deltas to clients.
 - 0.1, 2026-09-16: first consolidated spec from the five explainer pages and the model-layer study.
