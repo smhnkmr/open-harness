@@ -50,6 +50,7 @@ class Client(Protocol):
     def ask_human(self, req: ToolCallRequest, decision: Any) -> str: ...
     def ask_user(self, question: str, options: list[str]) -> str: ...
     def interrupted(self) -> bool: ...
+    # Optional: on_text_delta(role: str, text: str) -> None, for live streaming.
 
 
 @dataclass
@@ -90,7 +91,40 @@ class Session:
         self.rules: list[Rule] = self._load_rules()
         self.mode = config.policy.mode
         self.messages: list[Message] = log.replay_messages()
+        self._replay_session_state()
+        # Live text streaming to the client, if the client wants it.
+        on_delta = getattr(client, "on_text_delta", None)
+        if on_delta is not None and self.gateway.on_text_delta is None:
+            self.gateway.on_text_delta = on_delta
         self.log.append("session_start", cwd=str(self.cwd), mode=self.mode, resumed=bool(self.messages))
+
+    def _replay_session_state(self) -> None:
+        """Session-scoped rules and mode changes survive a resume via the log."""
+        for rec in self.log.read():
+            if rec.get("kind") == "rule_added":
+                self.rules.append(parse_rule(rec["rule"], rec.get("behavior", "allow"), "session"))
+            elif rec.get("kind") == "mode_changed":
+                self.mode = rec.get("mode", self.mode)
+
+    # ------------------------------------------------------------------ session controls (slash commands)
+
+    def add_rule(self, text: str, behavior: str = "allow") -> Rule:
+        rule = parse_rule(text, behavior, "session")  # type: ignore[arg-type]
+        self.rules.append(rule)
+        self.log.append("rule_added", rule=text, behavior=behavior)
+        return rule
+
+    def set_mode(self, mode: str) -> None:
+        self.mode = mode  # type: ignore[assignment]
+        self.log.append("mode_changed", mode=mode)
+
+    def usage_totals(self) -> dict[str, int]:
+        totals = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+        for rec in self.log.read():
+            if rec.get("kind") == "usage":
+                for key in totals:
+                    totals[key] += int(rec.get(key, 0) or 0)
+        return totals
 
     # ------------------------------------------------------------------ public
 
@@ -278,7 +312,7 @@ class Session:
         if decision.behavior == "ask":
             decision = reduce_ask(req, decision, pctx, classifier=None, human=self._human)
             if decision.suggested_rule and decision.behavior == "allow":
-                self.rules.append(parse_rule(decision.suggested_rule, "allow", "session"))
+                self.add_rule(decision.suggested_rule, "allow")
         self.log.append("permission_decision", tool=tool.name, behavior=decision.behavior,
                         step=decision.step, reason=decision.reason, immune=decision.immune)
         return decision

@@ -91,6 +91,9 @@ def reduce_ask(
             suggested_rule=suggested,
             step="reduce:3",
         )
+    if isinstance(verdict, str) and verdict.startswith("deny:") and verdict[5:].strip():
+        # "deny:<message>": the message goes back to the model as the error result.
+        return Decision(behavior="deny", reason=f"denied by user: {verdict[5:].strip()}", step="reduce:3")
     return Decision(behavior="deny", reason="denied by user", step="reduce:3")
 
 

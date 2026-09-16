@@ -23,7 +23,7 @@ EventKind = Literal[
     # tools
     "tool_call_start", "tool_call_end", "tool_result_persisted",
     # policy
-    "permission_decision", "approval_request", "approval_response",
+    "permission_decision", "approval_request", "approval_response", "rule_added", "mode_changed",
     # verification
     "verifier_result",
     # context

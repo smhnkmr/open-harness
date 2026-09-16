@@ -14,7 +14,7 @@ The normative design is in `SPEC.md`. This README covers the prototype only.
 | Policy | pooled rules, fixed decision order with bypass-immune checks, ask reducer (deterministic, then human) |
 | Verification | lint after every edit, test command before a turn may end |
 | Context | static prompt with cache boundary, AGENTS.md as first user message, summarise-tier compaction |
-| Client | stream-json over stdio, and a `-p` one-shot mode |
+| Client | stream-json over stdio, a `-p` one-shot mode, and an interactive `rich` terminal REPL |
 
 Not in the prototype: OS sandbox, classifier stage, sub-agents, memory, MCP, hooks, skills, IDE. The threat model for this prototype is one line: **it runs with your user's permissions and no sandbox; the policy engine is the only guard.**
 
@@ -28,10 +28,28 @@ export ANTHROPIC_API_KEY=...
 # one shot
 .venv/Scripts/python -m open_harness -p "list the python files here and summarise them"
 
+# interactive terminal REPL (rich rendering, live streaming, approval prompts)
+.venv/Scripts/python -m open_harness
+› add a docstring to main.py
+
 # interactive over stdio (JSON lines in, JSON lines out)
 .venv/Scripts/python -m open_harness --output-format stream-json
 {"op": "turn_input", "text": "add a docstring to main.py"}
 ```
+
+The terminal REPL is picked automatically when stdin is a tty (`--client auto`,
+the default); pass `--client stdio` to force the raw stream-json protocol, or
+`--client terminal` to force the REPL even when stdin is not a tty. Inside the
+REPL, slash commands control the session:
+
+| Command | Effect |
+|---|---|
+| `/help` | list slash commands |
+| `/mode <default\|accept_edits\|plan\|bypass\|dont_ask>` | change the policy mode |
+| `/rules` | list active policy rules |
+| `/cost` | show cumulative token usage |
+| `/thinking on\|off` | toggle showing model thinking blocks |
+| `/quit` | exit |
 
 ## Live run
 

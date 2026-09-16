@@ -19,6 +19,7 @@ from open_harness.model.types import (
     ModelRequest,
     ModelResponse,
     ProviderError,
+    TextDelta,
     ThinkingConfig,
     ToolSpec,
 )
@@ -46,6 +47,14 @@ class Gateway:
     on_event: Callable[[str, dict], None]          # log sink: kind, payload
     sleep: Callable[[float], None] = time.sleep     # injectable for tests
     latched_headers: set[str] | None = None         # spec P1: headers latch on for the session
+    on_text_delta: Callable[[str, str], None] | None = None   # (role, text) for live rendering; not logged
+
+    def _tap(self, role: str, events):
+        """Forward text deltas to the client as they stream; pass everything through."""
+        for ev in events:
+            if self.on_text_delta is not None and isinstance(ev, TextDelta):
+                self.on_text_delta(role, ev.text)
+            yield ev
 
     def call(self, role: str, *, system: list[Block], messages: list[Message], tools: list[ToolSpec],
              max_output_tokens: int, thinking: ThinkingConfig | None = None) -> ModelResponse:
@@ -68,7 +77,7 @@ class Gateway:
         last: ProviderError | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                resp = reduce(resolved.adapter.stream(resolved.model, req),
+                resp = reduce(self._tap(req.role, resolved.adapter.stream(resolved.model, req)),
                               model=resolved.spec, role=req.role)
                 self.on_event("usage", {"role": req.role, "spec": resolved.spec,
                                         "input": resp.usage.input_tokens, "output": resp.usage.output_tokens,

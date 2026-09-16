@@ -186,6 +186,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-session", type=str, default=None, metavar="ID|last",
                         help="pretty-print a session log and exit")
     parser.add_argument("--list-sessions", action="store_true", help="list session logs and exit")
+    parser.add_argument("--client", choices=("auto", "stdio", "terminal"), default="auto",
+                        help="which client surface to run: rich terminal REPL, raw stream-json stdio, "
+                             "or auto-detect from stdin (default)")
     return parser
 
 
@@ -356,6 +359,16 @@ def main(argv: list[str] | None = None) -> int:
         log = EventLog(config.session_root / f"{args.resume}.jsonl")
     else:
         log = new_session(config.session_root)
+
+    use_terminal = args.prompt is None and (
+        args.client == "terminal" or (args.client == "auto" and sys.stdin.isatty())
+    )
+    if use_terminal:
+        from open_harness.clients.terminal import run_terminal
+        try:
+            return run_terminal(config, cwd, log)
+        finally:
+            log.close()
 
     client = StdioClient(quiet=(args.prompt is not None and output_format == "text"),
                          non_interactive=args.prompt is not None)

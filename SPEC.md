@@ -585,4 +585,5 @@ Source readings, September 2026: Claude Code (local snapshot), opencode, OpenAI 
 
 ## 18. Changelog
 
+- 0.2, 2026-09-16: terminal client with approval prompts; session-scoped rules and mode changes recorded in the log and replayed on resume; deny-with-message reaches the model; gateway streams text deltas to clients.
 - 0.1, 2026-09-16: first consolidated spec from the five explainer pages and the model-layer study.
