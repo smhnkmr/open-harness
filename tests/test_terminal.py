@@ -523,3 +523,47 @@ def test_run_terminal_deny_with_message_reaches_tool_result(tmp_path: Path) -> N
     recs = list(session.log.read())
     tool_result_recs = [r for r in recs if r["kind"] == "tool_result"]
     assert any("not now" in json.dumps(r.get("message")) for r in tool_result_recs), tool_result_recs
+
+
+def test_ask_human_queues_non_answers_as_pending_input() -> None:
+    """A prompt typed while an approval is pending is kept for the next turn,
+    not swallowed as an unrecognised answer."""
+    client, buf = make_client(answers=["Now add a test for it", "y"])
+    verdict = client.ask_human(sample_request(), sample_decision())
+    assert verdict == "allow"
+    assert client.pending_inputs == ["Now add a test for it"]
+    assert "queued for the next turn" in buf.getvalue()
+
+
+def test_ask_human_short_typo_still_reprompts_without_queueing() -> None:
+    client, _ = make_client(answers=["bogus", "y"])
+    assert client.ask_human(sample_request(), sample_decision()) == "allow"
+    assert client.pending_inputs == []
+
+
+def test_repl_consumes_pending_inputs_before_stdin() -> None:
+    from types import SimpleNamespace
+
+    calls: list[str] = []
+
+    class S:
+        rules: list = []
+        resolver = None
+
+        def run_turn(self, text):
+            calls.append(text)
+            return SimpleNamespace(reason="completed")
+
+        def final_text(self):
+            return ""
+
+        def set_mode(self, m):
+            pass
+
+        def usage_totals(self):
+            return {}
+
+    client, _ = make_client(answers=["/quit"])
+    client.pending_inputs.append("queued prompt")
+    terminal._repl(S(), client, {"idle_ctrl_c": 0, "turn_running": False})
+    assert calls == ["queued prompt"]

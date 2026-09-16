@@ -140,7 +140,10 @@ def _windows_suspicious(raw: str) -> str | None:
     drive_colon = len(s) >= 2 and s[1] == ":" and s[0].isalpha()
     colon_positions = [i for i, c in enumerate(s) if c == ":"]
     extra_colons = [i for i in colon_positions if not (drive_colon and i == 1)]
-    if extra_colons:
+    # `::` is never an NTFS stream separator; it is a pytest node id
+    # (tests/x.py::test_y) or a C++/Rust scope. Only a single colon inside a
+    # filename component denotes an alternate data stream.
+    if extra_colons and "::" not in s:
         return "alternate data stream (':' in path)"
 
     if re.search(r"~\d", s):

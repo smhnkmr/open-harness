@@ -443,3 +443,12 @@ def test_compound_allowed_when_extra_segments_are_read_only_filters() -> None:
                           is_read_only=False, is_destructive=False)
     assert shell_fully_allowed(ok, "C:/tmp", rules)
     assert not shell_fully_allowed(bad, "C:/tmp", rules)
+
+
+def test_pytest_node_id_is_not_an_alternate_data_stream() -> None:
+    from open_harness.policy.safety import immune_check
+
+    cmd = "python -m pytest tests/test_terminal.py::test_handle_slash_version -v"
+    req = ToolCallRequest(tool_name="shell", args={"command": cmd}, permission_content=cmd,
+                          is_read_only=False, is_destructive=False)
+    assert immune_check(req, "C:/tmp") is None

@@ -101,14 +101,24 @@ def _environment_block(cwd: Path, env: dict[str, Any]) -> str:
     shell = env.get("shell") or os.environ.get("SHELL") or os.environ.get("COMSPEC") or "unknown"
     date = env.get("date") or datetime.now(UTC).date().isoformat()
     model = env.get("model", "unknown")
-    return (
-        "Environment:\n"
-        f"- cwd: {cwd}\n"
-        f"- platform: {platform_name}\n"
-        f"- shell: {shell}\n"
-        f"- date: {date}\n"
-        f"- model: {model}"
-    )
+    lines = [
+        "Environment:",
+        f"- cwd: {cwd}",
+        f"- platform: {platform_name}",
+        f"- shell: {shell}",
+        f"- date: {date}",
+        f"- model: {model}",
+    ]
+    # Tell the model which commands the harness itself uses, so it runs the
+    # same interpreter and test runner instead of guessing (a live run wasted
+    # several turns on the wrong `python`).
+    if env.get("python"):
+        lines.append(f"- python interpreter to use for this project: {env['python']}")
+    if env.get("test_command"):
+        lines.append(f"- test command (the harness runs this before a turn may end): {env['test_command']}")
+    if env.get("lint_command"):
+        lines.append(f"- lint command (the harness runs this after every edit): {env['lint_command']}")
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------- project instructions

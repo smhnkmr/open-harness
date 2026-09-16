@@ -345,9 +345,24 @@ class Session:
         tools_prompt = "\n\n".join(f"## {t.name}\n{t.prompt()}" for t in self.registry.tools.values())
         main = self.resolver.resolve("main")
         env = {"cwd": str(self.cwd), "platform": platform.platform(), "shell": shutil.which("bash") or "powershell",
-               "date": datetime.now(UTC).date().isoformat(), "model": main.spec}
+               "date": datetime.now(UTC).date().isoformat(), "model": main.spec,
+               "test_command": self.config.verify.test, "lint_command": self.config.verify.lint,
+               "python": self._project_python()}
         system = build_system(self.cwd, tools_prompt=tools_prompt, profile_suffix=None, env=env)
         return system, self.registry.specs()
+
+    def _project_python(self) -> str | None:
+        """Best guess at the interpreter for this project: the first token of the
+        configured test command if it looks like a python, else a venv in cwd."""
+        for cmd in (self.config.verify.test, self.config.verify.lint):
+            if cmd:
+                head = cmd.split()[0]
+                if "python" in head.lower():
+                    return head
+        for candidate in (".venv/Scripts/python.exe", ".venv/bin/python", "venv/Scripts/python.exe", "venv/bin/python"):
+            if (self.cwd / candidate).exists():
+                return str(self.cwd / candidate)
+        return None
 
     def _compact(self, state: State, *, reason: str) -> None:
         system, _ = self._build_request_parts()

@@ -224,3 +224,14 @@ def test_summary_prompt_forbids_tools_and_lists_nine_sections() -> None:
     assert "<analysis>" in SUMMARY_PROMPT
     assert "<summary>" in SUMMARY_PROMPT
     assert SUMMARY_PROMPT.index("Do not call any tools") < SUMMARY_PROMPT.index("<summary>")
+
+
+def test_environment_block_names_test_and_lint_commands(tmp_path):
+    from open_harness.context.prompt import build_system
+    blocks = build_system(tmp_path, tools_prompt="", profile_suffix=None,
+                         env={"test_command": "venv/python -m pytest -q", "lint_command": "ruff check {file}",
+                              "python": "venv/python"})
+    text = "\n".join(b.text or "" for b in blocks)
+    assert "venv/python -m pytest -q" in text
+    assert "ruff check {file}" in text
+    assert "python interpreter to use" in text

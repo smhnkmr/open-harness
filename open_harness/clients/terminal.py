@@ -27,6 +27,13 @@ PATH_TOOLS = ("read", "write", "edit", "glob", "grep")
 PATTERN_TOOLS = ("glob", "grep")
 
 
+def _looks_like_a_prompt(raw: str) -> bool:
+    """A line typed at an approval prompt that is clearly a next instruction,
+    not an attempt at y/a/n/d: a slash command, a sentence, or a long token."""
+    text = raw.strip()
+    return text.startswith("/") or " " in text or len(text) > 12
+
+
 class TerminalClient:
     """Renders the event log live and drives approvals from the terminal."""
 
@@ -39,6 +46,7 @@ class TerminalClient:
         self._streamed = ""
         self._interrupted = False
         self._turn_usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+        self.pending_inputs: list[str] = []   # lines typed while a prompt was pending; consumed by the REPL first
 
     # ------------------------------------------------------------------ Client protocol
 
@@ -72,6 +80,12 @@ class TerminalClient:
                     return "deny"
                 msg = msg.strip()
                 return f"deny:{msg}" if msg else "deny"
+            if _looks_like_a_prompt(raw):
+                # Not an answer: the user typed their next prompt while an approval
+                # was pending. Keep it for the next turn instead of dropping it.
+                self.pending_inputs.append(raw.strip())
+                self._line("queued for the next turn; still waiting for y / a / n / d")
+                continue
             self._line("unrecognised; enter y, a, n, or d")
 
     def ask_user(self, question: str, options: list[str]) -> str:
@@ -179,7 +193,10 @@ class TerminalClient:
             text = "".join(b.get("text", "") for b in block.get("content") or [] if b.get("type") == "text")
         text = (text or "").strip()
         if block.get("is_error"):
-            self._line(f"  ✗ {text[:200]}", style="red")
+            # Show the first informative line, not a bare "[stderr]" marker.
+            lines = [ln for ln in text.splitlines() if ln.strip() and ln.strip() not in ("[stderr]", "[stdout]")]
+            shown = " | ".join(ln.strip() for ln in lines[:2])[:200] or text[:200]
+            self._line(f"  ✗ {shown}", style="red")
         else:
             first = text.splitlines()[0] if text else ""
             summary = first if first else f"{len(text)} chars"
@@ -385,10 +402,14 @@ def run_terminal(config: Any, cwd: Path, log: Any, *, client: TerminalClient | N
 def _repl(session: Any, client: TerminalClient, state: dict[str, Any]) -> None:
     while True:
         state["idle_ctrl_c"] = 0
-        try:
-            line = client.input_fn("› ")
-        except (EOFError, KeyboardInterrupt):
-            return
+        if client.pending_inputs:
+            line = client.pending_inputs.pop(0)
+            client._line(f"› {line}")
+        else:
+            try:
+                line = client.input_fn("› ")
+            except (EOFError, KeyboardInterrupt):
+                return
         line = line.strip()
         if not line:
             continue
