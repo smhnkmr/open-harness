@@ -56,7 +56,7 @@ def test_run_lint_clean_pass_returns_empty() -> None:
 def test_run_lint_substitutes_file_placeholder() -> None:
     backend = FakeBackend(ExecResult(stdout="", stderr="", exit_code=0))
     run_lint(backend, "src/a.py", VerifyConfig(lint="ruff check {file} --fix"), "/cwd")
-    assert backend.calls == ["ruff check src/a.py --fix"]
+    assert backend.calls == ['ruff check "src/a.py" --fix']
 
 
 def test_run_lint_failure_returns_prefixed_tail() -> None:
