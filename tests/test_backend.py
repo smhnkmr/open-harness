@@ -112,3 +112,14 @@ def test_shell_detection_prefers_bash_when_present() -> None:
         assert shell == "bash"
     else:
         assert shell in ("powershell", "pwsh", "cmd", "sh")
+
+
+def test_path_prepend_puts_project_interpreter_first(tmp_path):
+    from open_harness.backend.local import LocalBackend
+
+    b = LocalBackend(root=tmp_path, path_prepend=[str(tmp_path / "venvbin")])
+    r = b.execute("echo $PATH" if b.shell == "bash" else "echo %PATH%", timeout=10)
+    # bash on Windows rewrites C:\x\y as /c/x/y or /tmp/...; compare on the unique leaf
+    separator = ":" if b.shell == "bash" else ";"
+    first_entry = r.stdout.strip().split(separator)[0]
+    assert first_entry.replace("\\", "/").endswith("/venvbin")

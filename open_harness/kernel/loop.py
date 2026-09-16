@@ -83,7 +83,9 @@ class Session:
         self.cwd = cwd.resolve()
         self.client = client
         self.log = log
-        self.backend = LocalBackend(root=self.cwd)
+        project_python = self._project_python()
+        self.backend = LocalBackend(root=self.cwd,
+                                    path_prepend=[str(Path(project_python).parent)] if project_python else None)
         self.registry = registry or default_registry()
         self.gateway = gateway or Gateway(resolver=RoleResolver(config), on_event=self._record)
         self.resolver = self.gateway.resolver

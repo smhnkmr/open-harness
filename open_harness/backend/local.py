@@ -76,9 +76,13 @@ class LocalBackend(Backend):
     """Executes commands on the local machine and reads/writes local files
     under `root`."""
 
-    def __init__(self, root: Path, shell: str | None = None) -> None:
+    def __init__(self, root: Path, shell: str | None = None, path_prepend: list[str] | None = None) -> None:
         self.root = Path(root).resolve()
         self.shell = shell or detect_shell()
+        # Directories placed ahead of PATH for every command, so `python`,
+        # `pytest` and `ruff` resolve to the project's interpreter rather than
+        # whatever the system has first.
+        self.path_prepend = [str(p) for p in (path_prepend or []) if p]
 
     # ------------------------------------------------------------------ exec
 
@@ -92,6 +96,8 @@ class LocalBackend(Backend):
     ) -> ExecResult:
         argv = _shell_argv(self.shell, cmd)
         run_env = _minimal_env(env)
+        if self.path_prepend:
+            run_env["PATH"] = os.pathsep.join([*self.path_prepend, run_env.get("PATH", "")])
         work_dir = str(Path(cwd).resolve()) if cwd is not None else str(self.root)
 
         popen_kwargs: dict[str, object] = {}
