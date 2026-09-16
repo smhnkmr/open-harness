@@ -16,7 +16,7 @@ stdout lines are JSON events mirroring event-log records, plus two
 client-only kinds not persisted verbatim in the log:
     {"kind": "approval_request", "request_id", "tool", "content", "reason", "suggested_rule"}
     {"kind": "user_question", "request_id", "question", "options"}
-    {"kind": "result", "reason": <TerminalReason>, "turns": n, "usage": {...}}
+    {"kind": "result", "reason": <TerminalReason>, "turns": n, "usage": {...}, "session_id": "..."}
 """
 
 from __future__ import annotations
@@ -226,6 +226,7 @@ def _drive_interactive(session: Any, client: StdioClient) -> None:
                 "reason": getattr(terminal, "reason", "completed"),
                 "turns": _last_turn_count(session.log),
                 "usage": _summed_usage(session.log),
+                "session_id": session.log.session_id,
             }
         )
 
@@ -392,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
                         "reason": reason,
                         "turns": _last_turn_count(log),
                         "usage": _summed_usage(log),
+                        "session_id": log.session_id,
                     }
                 )
             return 0

@@ -70,7 +70,12 @@ def immune_check(
             continue
         seen.add(raw)
 
-        reason = _dangerous_name_reason(raw)
+        # A read-only shell command that merely names a protected directory
+        # (`find . -path ./.git -prune`, `ls .git`) cannot modify it; only the
+        # protected-file check (secrets) still applies to it. Writes and file
+        # tools keep the full check.
+        read_only_shell = req.tool_name == "shell" and req.is_read_only
+        reason = _dangerous_name_reason(raw, check_dirs=not read_only_shell)
         if reason:
             return Decision(
                 behavior="ask",
@@ -112,10 +117,10 @@ def immune_check(
 # --- dangerous names ---------------------------------------------------
 
 
-def _dangerous_name_reason(raw: str) -> str | None:
+def _dangerous_name_reason(raw: str, *, check_dirs: bool = True) -> str | None:
     parts = [p for p in re.split(r"[\\/]+", raw) if p]
     for part in parts:
-        if part.lower() in DANGEROUS_DIRS:
+        if check_dirs and part.lower() in DANGEROUS_DIRS:
             return f"protected directory '{part}'"
     basename = parts[-1] if parts else raw
     for pattern in DANGEROUS_FILES:
@@ -225,6 +230,12 @@ def _extract_shell_paths(cmd: str) -> list[str]:
         if not stripped:
             continue
         if "/" in stripped or "\\" in stripped or stripped.startswith("~"):
+            paths.append(stripped)
+        elif stripped.startswith(".") and stripped not in (".", ".."):
+            # Bare dotfiles (`cat .env`, `ls .git`) are paths too; without
+            # this a secret read through the shell never reached the check.
+            paths.append(stripped)
+        elif any(fnmatch.fnmatchcase(stripped.lower(), p.lower()) for p in DANGEROUS_FILES):
             paths.append(stripped)
     return paths
 

@@ -1,0 +1,362 @@
+{
+  "eval_set_id": "open-harness-core",
+  "name": "open-harness core tasks",
+  "description": "Ten coding-agent tasks against the ledger fixture, run on open-harness and Claude Code by evals/driver.py. Outcomes are judged by per-task checkers (evals/tasks.py); ADK trajectory metrics are not used.",
+  "eval_cases": [
+    {
+      "eval_id": "t01",
+      "conversation": [
+        {
+          "invocation_id": "51aa00f6-439a-5099-abb8-7089be9ecaaf",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "I just cloned this repo and haven't looked at the code yet. Can you give me a quick overview of what it does and how the code is organized before I start poking around?"
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "qa",
+        "description": "Repo overview: name the modules and note it's a CLI app.",
+        "timeout_s": 600,
+        "checker": "check_t01",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t02",
+      "conversation": [
+        {
+          "invocation_id": "5a257196-e1ad-54d0-bad0-1d0dd8ba8ba8",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Where in this codebase is the logic that turns an account's opening balance and its transactions into a current balance? I need the exact file and function name so I can look at it."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "qa",
+        "description": "Locate where balances are computed (report.py:account_balance).",
+        "timeout_s": 600,
+        "checker": "check_t02",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t03",
+      "conversation": [
+        {
+          "invocation_id": "65c5c880-2cc4-533e-9110-273847d6adba",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Please add a small helper function called `net_change` to src/ledger/report.py. It should take a list of Transaction objects (the same type used elsewhere in this package) and return the sum of their `amount` fields as a float, rounded to 2 decimal places, the same way the other functions in that file round their results. It doesn't need to touch the store or any account - just add up the amounts it's given. Make sure the existing tests still pass."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Add report.net_change(transactions) -> float.",
+        "timeout_s": 600,
+        "checker": "check_t03",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t04",
+      "conversation": [
+        {
+          "invocation_id": "79f50277-84df-544b-b891-2043b9fbf01f",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Something's wrong with the balance calculation - I added an opening balance of 100 to an account and then a transaction for -20, and the reported balance came out as 120 instead of 80. Can you find the bug and fix it? Please make sure the test suite passes afterwards."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Fix a planted sign bug in account_balance (mutate flips += to -=).",
+        "timeout_s": 600,
+        "checker": "check_t04",
+        "mutate": "_mutate_t04_sign_bug"
+      }
+    },
+    {
+      "eval_id": "t05",
+      "conversation": [
+        {
+          "invocation_id": "282b0454-0e6a-54a7-935b-169a71b07d7b",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "I'd like to rename the `account_balance` function to `balance_for_account` - I think the new name reads better at the call site. Please rename it everywhere it's defined, called, and referenced (including the tests), and make sure nothing still refers to the old name. The test suite should still pass afterwards."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Rename account_balance -> balance_for_account everywhere.",
+        "timeout_s": 600,
+        "checker": "check_t05",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t06",
+      "conversation": [
+        {
+          "invocation_id": "62bdc0cf-0501-56e7-8427-452f0ed98e3f",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Can you add a new `summary` subcommand to the CLI? It should take no extra arguments beyond the usual `--file`, and it should just print the balance summary for every account in the ledger, using the existing `format_summary` function from report.py - one line per account, in the same format that function already produces."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Add a `summary` CLI subcommand that prints format_summary().",
+        "timeout_s": 600,
+        "checker": "check_t06",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t07",
+      "conversation": [
+        {
+          "invocation_id": "3c1bd19b-b882-5fa3-9b7c-594db199b5f7",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "I noticed the `overdrawn_accounts` function in report.py doesn't have any test coverage right now. Could you add a couple of tests for it? Cover at least the case where an account is overdrawn and the case where none are."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Add tests for overdrawn_accounts (mutate removes existing ones).",
+        "timeout_s": 600,
+        "checker": "check_t07",
+        "mutate": "_mutate_t07_drop_tests"
+      }
+    },
+    {
+      "eval_id": "t08",
+      "conversation": [
+        {
+          "invocation_id": "3219d44b-fa18-56cc-9f87-bd1a45d4458b",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Please add a `total_balance` function to report.py that takes a Store and returns the sum of every account's current balance (i.e. the sum of what `account_balance` would return for each account), rounded to 2 decimal places the same way the rest of that file does."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        },
+        {
+          "invocation_id": "bde7a17f-53ce-5096-b391-9a0bdd77f607",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Thanks - now please add tests for the `total_balance` function you just added. Cover a normal case with a couple of accounts, not just a trivial empty one."
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Two turns: add total_balance(store), then test it.",
+        "timeout_s": 600,
+        "checker": "check_t08",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t09",
+      "conversation": [
+        {
+          "invocation_id": "ce030976-9d0a-5601-a62e-a8db1578218b",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "I ran this and got a traceback I don't understand:\n\n$ python -m ledger.cli --file mine.json balance chk\nTraceback (most recent call last):\n  File \"src/ledger/cli.py\", line 78, in main\n    handlers[args.command](store, args)\n  File \"src/ledger/cli.py\", line 61, in _cmd_balance\n    print(f\"{account_balance(store, args.account_id):.2f}\")\n  File \"src/ledger/report.py\", line 19, in account_balance\n    account = store.get_account(account_id)\n  File \"src/ledger/store.py\", line 36, in get_account\n    raise KeyError(f\"unknown account: {account_id}\") from None\nKeyError: 'unknown account: chk'\n\nWhat's actually going wrong here, and which file and function is responsible for the error being raised?"
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "qa",
+        "description": "Diagnose a KeyError traceback from an unknown account id.",
+        "timeout_s": 600,
+        "checker": "check_t09",
+        "mutate": null
+      }
+    },
+    {
+      "eval_id": "t10",
+      "conversation": [
+        {
+          "invocation_id": "20f7f1d9-a266-5cde-a141-03e0aee5081f",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "The report output from `format_summary` looks pretty rough right now - could you make it nicer to look at?"
+              }
+            ]
+          },
+          "final_response": null,
+          "intermediate_data": null,
+          "creation_timestamp": 1789516800.0
+        }
+      ],
+      "session_input": {
+        "app_name": "open-harness",
+        "user_id": "eval",
+        "state": {
+          "fixture": "evals/fixture/template"
+        }
+      },
+      "creation_timestamp": 1789516800.0,
+      "open_harness": {
+        "kind": "edit",
+        "description": "Underspecified: 'make the report output nicer' (scope discipline).",
+        "timeout_s": 600,
+        "checker": "check_t10",
+        "mutate": null
+      }
+    }
+  ],
+  "creation_timestamp": 1789516800.0
+}

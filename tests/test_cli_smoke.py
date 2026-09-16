@@ -13,7 +13,7 @@ import pytest
 
 from open_harness.clients import stdio as cli
 from open_harness.kernel import roles as roles_mod
-from open_harness.model.types import Stop, TextDelta, ToolCallFragment, Usage
+from open_harness.model.types import Stop, TextDelta, Usage
 from tests.test_e2e_fake import ScriptedAdapter, tool_call
 
 CONFIG = """
@@ -84,3 +84,4 @@ def test_stream_json_approval_round_trip(project, monkeypatch, capsys):
     assert "result" in kinds, kinds
     result = [rec for rec in lines if rec.get("kind") == "result"][-1]
     assert result["reason"] == "completed"
+    assert result["session_id"]  # drivers resume with this id

@@ -1,6 +1,6 @@
 # open-harness: design and specification
 
-Status: living document. Version 0.4, 16 September 2026. Section 18 records what is built and what comes next; §18.4 records the decision not to build on Google ADK.
+Status: living document. Version 0.5, 16 September 2026. Section 18 records what is built and what comes next; §18.4 records the decision not to build on Google ADK.
 Origin: synthesised from source reading of Claude Code, opencode, Codex CLI, browser-use, Gemini CLI, OpenHands, Deep Agents and LangChain, plus Anthropic's published harness guidance. Companion explainer pages exist for each; this file is the normative record.
 
 Conventions: MUST, SHOULD and MAY are used in the RFC sense. Anything marked `[open]` is undecided. Anything marked `[expires]` is a guard that must carry a reason and a model version and be re-tested at each model release.
@@ -415,7 +415,7 @@ Model-emitted risk scores MAY be used to order and batch asks. They MUST NOT gat
 
 ### 8.5 Filesystem
 
-Every path variant is checked: symlink chains up to 40 hops, every intermediate target inside a working directory, dangling links resolved to the deepest existing ancestor. Windows path tricks are blocked on every platform: alternate data streams, 8.3 short names, device names, long-path prefixes, trailing dots. Two exclusions learned live: `::` is a pytest node id or a scope, never a stream separator, and `.` and `..` path components are not trailing-dot patterns.
+Every path variant is checked: symlink chains up to 40 hops, every intermediate target inside a working directory, dangling links resolved to the deepest existing ancestor. Windows path tricks are blocked on every platform: alternate data streams, 8.3 short names, device names, long-path prefixes, trailing dots. Two exclusions learned live: `::` is a pytest node id or a scope, never a stream separator, and `.` and `..` path components are not trailing-dot patterns. Protected directories (`.git`, `.ssh`, `.aws` and the like) send a request to a human unless the request is a read-only shell command, which cannot modify them; protected files (`.env`, keys, `open-harness.toml`) always do, and bare dotfile tokens in a shell command count as paths so `cat .env` reaches the check.
 
 ### 8.6 Secrets
 
@@ -613,12 +613,13 @@ Status as of 16 September 2026, against the prototype at https://github.com/smhn
 | Safety (§8) | Rules, fixed decision order, immune checks, compound splitting with read-only leniency, ask reducer stages 1 and 3. No OS sandbox, no classifier stage, no secrets substitution, no persisted rules. |
 | Context (§9) | Static prompt with boundary, environment block, project instructions, summarise tier. No clear or notes tiers, no attachments beyond instructions and verifier, no memory, no fresh-context mode. |
 | Interfaces (§12) | stdio stream-json client, one-shot mode, terminal client with approval prompts and six slash commands. No IDE, bridge or SDK. |
+| Evals (§14.3) | `evals/` driver: ten tasks on a synthetic `ledger` fixture, per-run committed workspaces, both harnesses from one driver with stdin detached, interleaved order, identical allow lists and project instructions, per-model list-price costing, resumable `runs.jsonl` and a markdown report. Cases exported as ADK `EvalSet` JSON. No simulated-user conversations, no `pass@k` over three rollouts yet (one rollout per run, `--runs` sets k). |
 
 Three live comparisons against Claude Code (a bug fix, a five-turn conversation, a nine-minute feature task) found nine harness defects, all fixed with regression tests, and left outcome, durability and cost within noise of each other. See §18.3.
 
 ### 18.2 Roadmap, in order
 
-1. **Eval driver.** Ten task types, five runs each, same model, both harnesses from one driver with stdin detached. Scores pass rate, API calls, cost, wall time, denials, and files touched outside scope. Everything below is judged by it.
+1. **Eval driver.** Built (0.5). Ten task types, five runs each, same model, both harnesses from one driver with stdin detached. Scores pass rate, API calls, cost, wall time, denials, and files touched outside scope. Everything below is judged by it. Still to add: files-touched-outside-scope as a first-class metric on every edit task (today only t10 records it), and a first full five-run matrix in §18.3.
 2. **Friction-free permissions.** Shell `permission_content` defaults to the first two tokens so "allow always" yields a reusable rule; rules persist to `.open-harness/rules.toml`.
 3. **Input during a turn.** Reader thread on stdin, Escape aborts at the next check point, cooperative cancel in the reducer for mid-stream abort.
 4. **Diff preview at approval** for edits outside the worktree and in accept-edits mode.
@@ -643,6 +644,8 @@ Re-check triggers. The ADK decision in §18.4 is revisited if either becomes tru
 
 Defects found by these tests, all fixed: child stdin inheritance hang; TOML key ordering; one-shot approvals blocking; console encoding; shell containment on interpreter paths; `::` and `./` false positives; `2>&1` treated as a write; lint path unquoted in bash; provider-error log key collision; adaptive thinking; interpreter not on PATH; prompts swallowed at approval; bare `[stderr]` rendering.
 
+Defects found by the eval driver's first smoke runs, both fixed: a read-only `find` naming `.git` was sent to a human (§8.5 now exempts read-only shell commands from the protected-directory check, secrets excepted); bare dotfile tokens such as `cat .env` never reached the protected-file check (§8.5 now treats them as paths).
+
 ### 18.4 Decision: not built on Google ADK
 
 Assessed 16 September 2026 against ADK Python v2.9.1. Twenty spec requirements were mapped to ADK primitives: three native (event log, evals, MCP and A2A), nine partial, three in conflict, five absent. The conflicts are the kernel: ADK's tool loop is selected by a private property and turn end is decided by `is_final_response()`, its canonical message type is Gemini's `Content`/`Part` with every other vendor converted, and its model classes branch on provider name, which P8 forbids. The absences are the verifier gate, the independent evaluator, coding tools, the guard registry and secrets substitution. Field evidence: no mature coding harness has shipped on ADK, Gemini CLI does not use it, the one attempt (adk-coder) wrote its own permission engine, and Claude through ADK has open issues for thinking with tool use, streamed tool arguments and cache control.
@@ -651,6 +654,7 @@ Decision: keep the kernel; adopt the `EvalSet` format (§14.3), the plugin callb
 
 ## 19. Changelog
 
+- 0.5, 2026-09-16: eval driver built (`evals/`, roadmap step 1); cases exported in ADK `EvalSet` format; two safety-check defects found by it fixed; stream-json result record carries the session id.
 - 0.4, 2026-09-16: Google ADK assessed and declined as a foundation (§18.4); eval cases adopt the ADK `EvalSet` format (§14.3); in-process hook names follow ADK's plugin callbacks (§11.1); A2A server added as a planned surface (§12.2) and roadmap step 8; re-check triggers recorded.
 - 0.3, 2026-09-16: implementation status and roadmap added; rules for compound commands, stderr redirects and shell containment; environment block names interpreter and verify commands; terminal pending-input queue. Nine live-found defects fixed.
 - 0.2, 2026-09-16: terminal client with approval prompts; session-scoped rules and mode changes recorded in the log and replayed on resume; deny-with-message reaches the model; gateway streams text deltas to clients.

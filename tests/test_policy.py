@@ -461,3 +461,27 @@ def test_dot_relative_path_is_not_a_trailing_dot_pattern() -> None:
     req = ToolCallRequest(tool_name="read", args={"file_path": p}, permission_content=p,
                           is_read_only=True, is_destructive=False, paths=[p])
     assert immune_check(req, os.getcwd()) is None
+
+
+def test_read_only_shell_may_name_protected_directory():
+    """A read-only `find` that prunes .git cannot modify it; the safety check
+    must not send it to a human. Found by the eval driver (t01, open-harness
+    denied `find . -path ./.git -prune ... | head`). Writes still ask."""
+    from open_harness.policy.safety import immune_check
+    from open_harness.policy.types import ToolCallRequest
+
+    cmd = "find . -path ./.venv -prune -o -path ./.git -prune -o -type f -print | head -200"
+    ro = ToolCallRequest(tool_name="shell", args={"command": cmd}, permission_content=cmd,
+                         is_read_only=True, is_destructive=False, paths=[])
+    assert immune_check(ro, "/proj") is None
+
+    write = "rm -rf .git"
+    rw = ToolCallRequest(tool_name="shell", args={"command": write}, permission_content=write,
+                         is_read_only=False, is_destructive=True, paths=[])
+    assert immune_check(rw, "/proj") is not None
+
+    # Secrets stay protected even for read-only commands.
+    leak = "cat .env"
+    ro_leak = ToolCallRequest(tool_name="shell", args={"command": leak}, permission_content=leak,
+                              is_read_only=True, is_destructive=False, paths=[])
+    assert immune_check(ro_leak, "/proj") is not None
