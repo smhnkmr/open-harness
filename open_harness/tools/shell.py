@@ -26,7 +26,21 @@ _READ_ONLY_COMMANDS = {
     "ls", "dir", "cat", "head", "tail", "grep", "rg", "find", "echo", "pwd",
     "which", "type", "wc", "sort", "uniq", "diff", "file", "stat",
     "printenv", "env", "whoami", "date", "true", "false", "test", "cd",
+    "export",  # only sets a variable in the child shell
 }
+
+# `NAME=value` words before the program name (`PYTHONPATH=src python -m x`).
+# Values with `$`, backticks or quotes are left alone so the safety check
+# still sees them.
+_ENV_PREFIX_RE = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_]*=[^\s\"'`$]*\s+)+")
+
+
+def strip_env_prefix(segment: str) -> str:
+    """Drop leading `NAME=value` assignments so rules and the read-only
+    check see the program that actually runs. The eval matrix found Sonnet
+    writing `PYTHONPATH=src <python> -m pytest` and being denied because
+    no rule starts with `PYTHONPATH=`."""
+    return _ENV_PREFIX_RE.sub("", segment.lstrip())
 
 _READ_ONLY_GIT_SUBCOMMANDS = {"status", "log", "diff", "show", "branch"}
 
@@ -49,7 +63,7 @@ def _segment_is_read_only(segment: str) -> bool:
     if ">" in stripped:  # covers both > and >>
         return False
     try:
-        tokens = shlex.split(segment)
+        tokens = shlex.split(strip_env_prefix(segment))
     except ValueError:
         return False
     if not tokens:

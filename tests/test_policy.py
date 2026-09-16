@@ -485,3 +485,32 @@ def test_read_only_shell_may_name_protected_directory():
     ro_leak = ToolCallRequest(tool_name="shell", args={"command": leak}, permission_content=leak,
                               is_read_only=True, is_destructive=False, paths=[])
     assert immune_check(ro_leak, "/proj") is not None
+
+
+def test_env_assignment_prefix_is_stripped_for_rules_and_read_only():
+    """`PYTHONPATH=src <python> -m pytest` must match `shell(<python>*)`, and
+    `FOO=1 ls` is still read-only. Found by the eval matrix (t10, 4 denials)."""
+    from open_harness.policy.rules import parse_rule, shell_fully_allowed
+    from open_harness.policy.types import ToolCallRequest
+    from open_harness.tools.shell import command_is_read_only, strip_env_prefix
+
+    assert strip_env_prefix("PYTHONPATH=src python -m pytest") == "python -m pytest"
+    assert strip_env_prefix("A=1 B=2 ls") == "ls"
+    assert strip_env_prefix('X="a b" ls') == 'X="a b" ls'  # quoted value: left alone
+    assert strip_env_prefix("X=$(id) ls") == "X=$(id) ls"  # substitution: left alone
+    assert command_is_read_only("PYTHONPATH=src ls -la")
+    assert command_is_read_only("export PYTHONPATH=src && ls")
+    assert not command_is_read_only("PYTHONPATH=src rm -rf x")
+
+    rule = parse_rule("shell(C:/v/python.exe*)", "allow", "test")
+    cmd = "PYTHONPATH=src C:/v/python.exe -m pytest -q"
+    req = ToolCallRequest(tool_name="shell", args={"command": cmd}, permission_content=cmd,
+                          is_read_only=False, is_destructive=True, paths=[])
+    assert shell_fully_allowed(req, "/proj", [rule])
+
+    deny = parse_rule("shell(rm -rf*)", "deny", "test")
+    from open_harness.policy.rules import matches
+    bad = "FOO=1 rm -rf /"
+    bad_req = ToolCallRequest(tool_name="shell", args={"command": bad}, permission_content=bad,
+                              is_read_only=False, is_destructive=True, paths=[])
+    assert matches(deny, bad_req, "/proj")

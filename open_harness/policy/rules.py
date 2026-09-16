@@ -175,6 +175,14 @@ def _segment_is_read_only(segment: str) -> bool:
     return check(segment)
 
 
+def _strip_env_prefix(segment: str) -> str:
+    try:
+        from open_harness.tools.shell import strip_env_prefix
+    except ImportError:  # pragma: no cover - tools package always present
+        return segment
+    return strip_env_prefix(segment)
+
+
 def path_under(path: str, root: str) -> bool:
     """Lexical containment check (no symlink resolution): is `path` at or
     below `root`? Case-insensitive, since this prototype targets Windows and
@@ -206,6 +214,7 @@ def suggest_rule(req: ToolCallRequest) -> str:
 
 
 def _shell_content_matches(content: str, command: str) -> bool:
+    command = _strip_env_prefix(command)
     if content.endswith(":*"):
         prefix = content[:-2]
         return command.startswith(prefix)

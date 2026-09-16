@@ -50,7 +50,9 @@ TOOL_GUIDANCE = (
     "with cd. Keep commands simple: one command per call, no shell loops, no "
     "git stash. The lint and test commands listed under Environment are run by "
     "the harness after edits and before a turn may end, so you rarely need to "
-    "run them yourself."
+    "run them yourself.\n"
+    "- For a quick check, run python -c inline; do not write throwaway scripts "
+    "into the project, they are linted like any other file and must be deleted."
 )
 
 TONE = (

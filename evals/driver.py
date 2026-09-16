@@ -226,6 +226,10 @@ def run_matrix(
     run_cc_fn = run_cc_fn or get_run_cc()
     stream = stream if stream is not None else sys.stdout
 
+    # Absolute: workspace paths are handed to subprocesses whose cwd differs
+    # from the driver's (a relative --out put a relative src/ on PYTHONPATH
+    # and every import check failed).
+    out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     runs_path = out_dir / "runs.jsonl"
     existing = _read_existing(runs_path) if resume else set()
@@ -272,6 +276,7 @@ def _dry_run(
     Cheap validation of fixtures/checkers. Returns 0 if every checker
     passed (or reported a clean CheckResult), 1 otherwise.
     """
+    out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     any_failed = False
     for task in tasks:

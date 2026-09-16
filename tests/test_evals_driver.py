@@ -8,6 +8,7 @@ in-process fakes instead of depending on those modules existing.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from pathlib import Path
@@ -338,3 +339,23 @@ def test_driver_runner_exception_does_not_stop_matrix(monkeypatch, tmp_path: Pat
 
     # the checker must have been skipped for the crashed run (7 = 8 - 1)
     assert len(check_calls) == 7
+
+
+def test_run_matrix_resolves_relative_out_dir(tmp_path, monkeypatch):
+    """A relative --out must not leak relative workspace paths to runners."""
+    from evals import driver
+    from evals.types import CheckResult, RunRecord, TaskSpec
+
+    monkeypatch.chdir(tmp_path)
+    seen = {}
+
+    def fake_run_oh(task, workspace, model, run_index, **kw):
+        seen["workspace"] = Path(workspace)
+        return RunRecord(task_id=task.id, harness="oh", model=model, run_index=run_index,
+                         passed=False, final_texts=["x"])
+
+    task = TaskSpec(id="t", kind="qa", prompts=["p"], check=lambda w, t: CheckResult(True))
+    driver.run_matrix(harnesses=["oh"], model="m", tasks=[task], runs=1, out_dir=Path("rel"),
+                      build_workspace_fn=fake_build_workspace, run_oh_fn=fake_run_oh,
+                      run_cc_fn=None, stream=io.StringIO())
+    assert seen["workspace"].is_absolute()

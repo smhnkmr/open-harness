@@ -70,7 +70,8 @@ compactor = "anthropic:claude-haiku-4-5"
 [policy]
 mode = "accept_edits"
 allow = ["read", "grep", "glob", "shell(python*)", "shell(pytest*)", "shell(ruff*)", \
-"shell(__HARNESS_PYTHON__*)", "shell(git status*)", "shell(git diff*)", "shell(git log*)", \
+"shell(__HARNESS_PYTHON__*)", "shell(\\"__HARNESS_PYTHON__\\"*)", \
+"shell(git status*)", "shell(git diff*)", "shell(git log*)", \
 "shell(ls*)", "shell(cat*)", "shell(find*)", "shell(wc*)"]
 
 [verify]
@@ -84,7 +85,7 @@ test = "__HARNESS_PYTHON__ -m pytest -q -x"
 CC_ALLOWED_TOOLS = (
     "Bash(python *),Bash(python.exe *),Bash(pytest *),Bash(ruff *),Bash(git status *),"
     "Bash(git diff *),Bash(git log *),Bash(ls *),Bash(cat *),Bash(find *),Bash(wc *),"
-    "Bash(cd *)"
+    "Bash(cd *),Bash(export *)"
 )
 
 

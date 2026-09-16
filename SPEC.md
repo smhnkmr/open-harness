@@ -394,7 +394,7 @@ Rules are pooled from every settings source; a deny anywhere wins. Precedence be
 
 `ToolName` or `ToolName(content)`. Shell rules are prefix or glob: `shell(git *)`, `shell(npm install:*)`. Path rules use gitignore syntax: `read(~/.zshrc)`, `edit(/src/**)`, leading slash relative to the settings file, double slash for root. `mcp__server__tool` or `mcp__server`. `fetch(domain:example.com)`.
 
-Compound shell commands are split on `&&`, `||`, `;` and `|`. Any segment matching a deny or ask rule triggers it. The whole command is allowed only when every segment is covered by an allow rule or is a known read-only filter such as `tail`, `head`, `grep`, `wc` or `cd`. Stderr redirects (`2>&1`, `2>/dev/null`) are not writes. Shell loops, `git stash` and command substitution are never auto-allowed. Containment (§8.5) applies to file tools only: a shell command may name an interpreter outside the project.
+Compound shell commands are split on `&&`, `||`, `;` and `|`. Any segment matching a deny or ask rule triggers it. The whole command is allowed only when every segment is covered by an allow rule or is a known read-only filter such as `tail`, `head`, `grep`, `wc` or `cd`. Stderr redirects (`2>&1`, `2>/dev/null`) are not writes. Leading `NAME=value` assignments are stripped before a segment is matched or judged read-only, unless the value contains quotes, `$` or backticks; `export` is read-only. Shell loops, `git stash` and command substitution are never auto-allowed. Containment (§8.5) applies to file tools only: a shell command may name an interpreter outside the project.
 
 Settings sources, lowest to highest for scalars: user, project, local, flag, managed. Managed may set managed-rules-only, managed-hooks-only, managed-servers-only, disable-bypass, marketplace allowlists, `models.allowed`. A corrupt managed file blocks every command except help, version and doctor. An unparseable deny list denies everything.
 
@@ -429,7 +429,7 @@ Credentials are placeholders substituted at execution time. The model sees a key
 
 An array of sections. Static first: identity, system rules, doing tasks, executing actions with care, using tools, tone. Then the literal `BOUNDARY` marker. Then dynamic: session guidance, memory index, environment block, output style, MCP instructions. Adapters place the cache breakpoint at the boundary. The date in the environment block is left stale at midnight; a `date_change` attachment patches it `[P1]`.
 
-The environment block names the project's interpreter and the configured lint and test commands, and the tool guidance says that commands already run in the project directory, that commands should stay simple, and that the harness runs lint and tests itself. These lines exist because Sonnet models guessed the interpreter, prefixed every command with `cd`, and re-ran tests the gate was about to run `[expires: added for claude-sonnet-4-5 and claude-sonnet-5, 2026-09; move into harness profiles once they exist]`.
+The environment block names the project's interpreter and the configured lint and test commands, and the tool guidance says that commands already run in the project directory, that commands should stay simple, and that the harness runs lint and tests itself. A further line says to use `python -c` for quick checks rather than writing throwaway scripts into the project. These lines exist because Sonnet models guessed the interpreter, prefixed every command with `cd`, re-ran tests the gate was about to run, and wrote scratch files that then failed lint and cost turns to delete `[expires: added for claude-sonnet-4-5 and claude-sonnet-5, 2026-09; move into harness profiles once they exist]`.
 
 ### 9.2 Project instructions
 
@@ -619,7 +619,7 @@ Three live comparisons against Claude Code (a bug fix, a five-turn conversation,
 
 ### 18.2 Roadmap, in order
 
-1. **Eval driver.** Built (0.5). Ten task types, five runs each, same model, both harnesses from one driver with stdin detached. Scores pass rate, API calls, cost, wall time, denials, and files touched outside scope. Everything below is judged by it. Still to add: files-touched-outside-scope as a first-class metric on every edit task (today only t10 records it), and a first full five-run matrix in §18.3.
+1. **Eval driver.** Built (0.5). Ten task types, five runs each, same model, both harnesses from one driver with stdin detached. Scores pass rate, API calls, cost, wall time, denials, and files touched outside scope. Everything below is judged by it. First full matrix recorded in §18.3. Still to add: files-touched-outside-scope as a first-class metric on every edit task (today only t10 records it); lint once per tool batch on the set of edited files instead of after each edit, since 40 of the 47 lint failures in the matrix were transient states inside a multi-edit batch that the model's next queued edit fixed; a simulated-user conversation task type.
 2. **Friction-free permissions.** Shell `permission_content` defaults to the first two tokens so "allow always" yields a reusable rule; rules persist to `.open-harness/rules.toml`.
 3. **Input during a turn.** Reader thread on stdin, Escape aborts at the next check point, cooperative cancel in the reducer for mid-stream abort.
 4. **Diff preview at approval** for edits outside the worktree and in accept-edits mode.
@@ -646,6 +646,24 @@ Defects found by these tests, all fixed: child stdin inheritance hang; TOML key 
 
 Defects found by the eval driver's first smoke runs, both fixed: a read-only `find` naming `.git` was sent to a human (§8.5 now exempts read-only shell commands from the protected-directory check, secrets excepted); bare dotfile tokens such as `cat .env` never reached the protected-file check (§8.5 now treats them as paths).
 
+**First full matrix, 16 September 2026.** Ten tasks, five runs each, Sonnet 5 on both, from `evals/driver.py`; report and run records in `evals/reports/20260916-sonnet5-full/`.
+
+| | open-harness | Claude Code |
+|---|---|---|
+| Pass rate | 50/50 | 50/50 |
+| API calls, total | 349 | 425 |
+| Tool calls, total | 413 | 460 |
+| Cache read tokens per call, mean | 2.4k to 10.2k by task | 28k to 39k by task |
+| Cost, list price for both | $2.99 | $10.08 (Claude Code reported $8.21) |
+| Wall time, total | 1589 s | 1722 s |
+| Denials | 25 | 35 |
+| Verifier failures | 47, all lint after an edit, none at the test gate | not applicable |
+| Files changed on the vague task (t10) | 1 in every run | 1 in every run |
+
+Reading. Outcome is tied at 100 percent, so this matrix cannot rank the harnesses on correctness; it ranks them on what correctness costs. open-harness spends 18 percent fewer API calls, 8 percent less wall time, and 30 to 37 percent of the money, almost entirely because its cached prefix is a tenth the size. Per-task spread is wide (t05 on Claude Code: 6 to 17 calls; t10 on open-harness: 15 to 31 calls), so single-task deltas under about 30 percent are noise at n=5. On t10 open-harness averaged 21 calls to Claude Code's 16: both harnesses' models wrote scratch preview scripts, but open-harness denied `rm` on them, costing about two calls per affected run; the test gate never bounced a t10 run. Denials on both sides were dominated by compound `cd ... && ...` chains, `xargs` pipes, env-assignment prefixes and quoted interpreter paths; `rm`, `del` and `sed -i` denials are the policy working as designed. None changed an outcome.
+
+Changes made from the matrix: leading `NAME=value` assignments are stripped before rule matching (§8.3), `export` is read-only, the eval config gives open-harness the quoted interpreter rule it already gave Claude Code, and the prompt tells the model not to write throwaway scripts into the project (§9.1). The eval driver itself had one defect: a relative `--out` put a relative `src` on the checkers' `PYTHONPATH`; paths are now resolved.
+
 ### 18.4 Decision: not built on Google ADK
 
 Assessed 16 September 2026 against ADK Python v2.9.1. Twenty spec requirements were mapped to ADK primitives: three native (event log, evals, MCP and A2A), nine partial, three in conflict, five absent. The conflicts are the kernel: ADK's tool loop is selected by a private property and turn end is decided by `is_final_response()`, its canonical message type is Gemini's `Content`/`Part` with every other vendor converted, and its model classes branch on provider name, which P8 forbids. The absences are the verifier gate, the independent evaluator, coding tools, the guard registry and secrets substitution. Field evidence: no mature coding harness has shipped on ADK, Gemini CLI does not use it, the one attempt (adk-coder) wrote its own permission engine, and Claude through ADK has open issues for thinking with tool use, streamed tool arguments and cache control.
@@ -654,7 +672,7 @@ Decision: keep the kernel; adopt the `EvalSet` format (§14.3), the plugin callb
 
 ## 19. Changelog
 
-- 0.5, 2026-09-16: eval driver built (`evals/`, roadmap step 1); cases exported in ADK `EvalSet` format; two safety-check defects found by it fixed; stream-json result record carries the session id.
+- 0.5, 2026-09-16: eval driver built (`evals/`, roadmap step 1); cases exported in ADK `EvalSet` format; two safety-check defects found by it fixed; stream-json result record carries the session id. First full matrix recorded in §18.3: 100/100 on both harnesses, open-harness at a third of the cost; env-assignment prefixes stripped in rule matching; scratch-script guard line.
 - 0.4, 2026-09-16: Google ADK assessed and declined as a foundation (§18.4); eval cases adopt the ADK `EvalSet` format (§14.3); in-process hook names follow ADK's plugin callbacks (§11.1); A2A server added as a planned surface (§12.2) and roadmap step 8; re-check triggers recorded.
 - 0.3, 2026-09-16: implementation status and roadmap added; rules for compound commands, stderr redirects and shell containment; environment block names interpreter and verify commands; terminal pending-input queue. Nine live-found defects fixed.
 - 0.2, 2026-09-16: terminal client with approval prompts; session-scoped rules and mode changes recorded in the log and replayed on resume; deny-with-message reaches the model; gateway streams text deltas to clients.

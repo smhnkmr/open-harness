@@ -37,7 +37,7 @@ _SUBPROCESS_TIMEOUT_S = 60
 
 def _with_pythonpath(workspace: Path) -> dict[str, str]:
     env = dict(os.environ)
-    src = str(workspace / "src")
+    src = str(Path(workspace).resolve() / "src")  # subprocess cwd may differ
     existing = env.get("PYTHONPATH")
     env["PYTHONPATH"] = f"{src}{os.pathsep}{existing}" if existing else src
     return env

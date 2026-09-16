@@ -206,3 +206,18 @@ run. Concretely:
 - open-harness never routed bare dotfile tokens such as `cat .env` through
   the protected-file check (only tokens containing a slash counted as
   paths). Fixed.
+- open-harness denied `PYTHONPATH=src <python> -m pytest` because rule
+  matching did not strip a leading `NAME=value` assignment. Fixed in the
+  rule matcher; `export` is now read-only.
+- The eval config gave Claude Code a quoted-interpreter allow rule but not
+  open-harness. Fixed.
+- The driver itself: a relative `--out` put a relative `src` on the
+  checkers' PYTHONPATH and failed every import check. Paths are resolved
+  now.
+
+## Results
+
+- `evals/reports/20260916-sonnet5-full/`: the first full matrix, Sonnet 5,
+  100 runs. Both harnesses 50/50; open-harness 349 API calls and $2.99 at
+  list price against Claude Code's 425 calls and $10.08 ($8.21 reported).
+  Analysis in SPEC.md 18.3.
