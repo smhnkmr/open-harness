@@ -1,6 +1,6 @@
 # open-harness: design and specification
 
-Status: living document. Version 0.1, 16 September 2026.
+Status: living document. Version 0.3, 16 September 2026. Section 18 records what is built and what comes next.
 Origin: synthesised from source reading of Claude Code, opencode, Codex CLI, browser-use, Gemini CLI, OpenHands, Deep Agents and LangChain, plus Anthropic's published harness guidance. Companion explainer pages exist for each; this file is the normative record.
 
 Conventions: MUST, SHOULD and MAY are used in the RFC sense. Anything marked `[open]` is undecided. Anything marked `[expires]` is a guard that must carry a reason and a model version and be re-tested at each model release.
@@ -343,6 +343,8 @@ Backend {
 
 All file tools derive from these three. A composite backend routes by path prefix, mounts durable memory at `/memories`, and pins `execute` to the default backend; execution is never path-routed. A new sandbox provider is one adapter, roughly a hundred lines. Credential provenance is checked: workspace-resolved credentials are compared with process-resolved ones and mixed or half-set pairs are rejected.
 
+Commands run with the project's interpreter first on PATH. The interpreter is taken from the configured verify commands, else a venv found in cwd. Commands never inherit the harness's stdin. (Both learned live: the model reached for a system `python` without pytest, and child processes hung on the client pipe.)
+
 ---
 
 ## 7. Verification
@@ -392,6 +394,8 @@ Rules are pooled from every settings source; a deny anywhere wins. Precedence be
 
 `ToolName` or `ToolName(content)`. Shell rules are prefix or glob: `shell(git *)`, `shell(npm install:*)`. Path rules use gitignore syntax: `read(~/.zshrc)`, `edit(/src/**)`, leading slash relative to the settings file, double slash for root. `mcp__server__tool` or `mcp__server`. `fetch(domain:example.com)`.
 
+Compound shell commands are split on `&&`, `||`, `;` and `|`. Any segment matching a deny or ask rule triggers it. The whole command is allowed only when every segment is covered by an allow rule or is a known read-only filter such as `tail`, `head`, `grep`, `wc` or `cd`. Stderr redirects (`2>&1`, `2>/dev/null`) are not writes. Shell loops, `git stash` and command substitution are never auto-allowed. Containment (§8.5) applies to file tools only: a shell command may name an interpreter outside the project.
+
 Settings sources, lowest to highest for scalars: user, project, local, flag, managed. Managed may set managed-rules-only, managed-hooks-only, managed-servers-only, disable-bypass, marketplace allowlists, `models.allowed`. A corrupt managed file blocks every command except help, version and doctor. An unparseable deny list denies everything.
 
 ### 8.4 Ask reducer
@@ -411,7 +415,7 @@ Model-emitted risk scores MAY be used to order and batch asks. They MUST NOT gat
 
 ### 8.5 Filesystem
 
-Every path variant is checked: symlink chains up to 40 hops, every intermediate target inside a working directory, dangling links resolved to the deepest existing ancestor. Windows path tricks are blocked on every platform: alternate data streams, 8.3 short names, device names, long-path prefixes, trailing dots.
+Every path variant is checked: symlink chains up to 40 hops, every intermediate target inside a working directory, dangling links resolved to the deepest existing ancestor. Windows path tricks are blocked on every platform: alternate data streams, 8.3 short names, device names, long-path prefixes, trailing dots. Two exclusions learned live: `::` is a pytest node id or a scope, never a stream separator, and `.` and `..` path components are not trailing-dot patterns.
 
 ### 8.6 Secrets
 
@@ -424,6 +428,8 @@ Credentials are placeholders substituted at execution time. The model sees a key
 ### 9.1 System prompt
 
 An array of sections. Static first: identity, system rules, doing tasks, executing actions with care, using tools, tone. Then the literal `BOUNDARY` marker. Then dynamic: session guidance, memory index, environment block, output style, MCP instructions. Adapters place the cache breakpoint at the boundary. The date in the environment block is left stale at midnight; a `date_change` attachment patches it `[P1]`.
+
+The environment block names the project's interpreter and the configured lint and test commands, and the tool guidance says that commands already run in the project directory, that commands should stay simple, and that the harness runs lint and tests itself. These lines exist because Sonnet models guessed the interpreter, prefixed every command with `cd`, and re-ran tests the gate was about to run `[expires: added for claude-sonnet-4-5 and claude-sonnet-5, 2026-09; move into harness profiles once they exist]`.
 
 ### 9.2 Project instructions
 
@@ -521,6 +527,8 @@ Clients push ops and read events. Any socket transport MUST be authenticated; th
 
 Terminal UI, headless with `text | json | stream-json` output and a stream-json control channel over stdio, IDE via lock-file discovery and an MCP connection, web and mobile via an authenticated bridge that spawns child sessions, and an SDK. All are thin.
 
+The terminal renders every log record through a listener, so the screen and the transcript are the same data. Its approval prompt offers allow once, allow always, deny, and deny with a message that reaches the model. A line typed at the prompt that is clearly a next instruction is queued for the next turn rather than dropped. In one-shot mode approvals fail closed and are logged.
+
 ### 12.3 Exit codes
 
 Zero on success, one on any error, with the error subtype in the final event.
@@ -583,7 +591,49 @@ Two suites: diagnostic unit evals that each assert one behaviour, and a holistic
 
 Source readings, September 2026: Claude Code (local snapshot), opencode, OpenAI Codex CLI, browser-use, Google Gemini CLI, OpenHands and its SDK, LangChain Deep Agents and dcode, LangChain core and partner packages. Published guidance: Anthropic on building effective agents, context engineering, long-running harnesses and managed agents; SWE-agent on agent-computer interfaces; Cursor and LangChain on harness engineering.
 
-## 18. Changelog
+## 18. Implementation status and roadmap
 
+Status as of 16 September 2026, against the prototype at https://github.com/smhnkmr/open-harness.
+
+### 18.1 Built and live-verified
+
+| Area | State |
+|---|---|
+| Loop (§4) | State machine with named transitions, parallel read-only batches, invalid-call retry, max-output recovery, two-signature turn end. No streaming tool start, no token budget, no mechanical loop detection yet. |
+| Event log (§3) | JSONL, resume, listeners, `--show-session` and `--list-sessions` viewers. No fork, no file-history snapshots. |
+| Model layer (§5) | Neutral types, two-method adapter, kernel reducer, `anthropic` and `openai-compatible` adapters, roles with inheritance, retry and fallback, adaptive-thinking switch. No capability dataset, no harness profile registry, no conformance suite, no Gemini or LangChain bridge adapters. The openai-compatible adapter has run only against fakes. |
+| Tools (§6) | read, edit, write, shell, grep, glob, ask_user; truncate-to-disk; local backend with PATH prepend. No fetch, agent, tool search, MCP. |
+| Verification (§7) | Lint after edit, test gate before done. No evaluator role, no sprint contract. |
+| Safety (§8) | Rules, fixed decision order, immune checks, compound splitting with read-only leniency, ask reducer stages 1 and 3. No OS sandbox, no classifier stage, no secrets substitution, no persisted rules. |
+| Context (§9) | Static prompt with boundary, environment block, project instructions, summarise tier. No clear or notes tiers, no attachments beyond instructions and verifier, no memory, no fresh-context mode. |
+| Interfaces (§12) | stdio stream-json client, one-shot mode, terminal client with approval prompts and six slash commands. No IDE, bridge or SDK. |
+
+Three live comparisons against Claude Code (a bug fix, a five-turn conversation, a nine-minute feature task) found nine harness defects, all fixed with regression tests, and left outcome, durability and cost within noise of each other. See §18.3.
+
+### 18.2 Roadmap, in order
+
+1. **Eval driver.** Ten task types, five runs each, same model, both harnesses from one driver with stdin detached. Scores pass rate, API calls, cost, wall time, denials, and files touched outside scope. Everything below is judged by it.
+2. **Friction-free permissions.** Shell `permission_content` defaults to the first two tokens so "allow always" yields a reusable rule; rules persist to `.open-harness/rules.toml`.
+3. **Input during a turn.** Reader thread on stdin, Escape aborts at the next check point, cooperative cancel in the reducer for mid-stream abort.
+4. **Diff preview at approval** for edits outside the worktree and in accept-edits mode.
+5. **Harness profiles.** The registry from §5.6. First entry: the Sonnet guidance lines from §9.1, with reason and date.
+6. **Multi-vendor live.** `explore` on a local Ollama model, `classifier` on a small OpenAI model, eval suite across three vendors.
+7. **Classifier stage** of the ask reducer (§8.4 stage 2).
+
+Deferred until those are done: sub-agents and forks, memory with hashed citations, compaction tiers one and two, OS sandbox, MCP, hooks, remaining stream-json ops.
+
+### 18.3 Comparison record
+
+| Test | Claude Code | open-harness | Outcome |
+|---|---|---|---|
+| Bug fix, same model | 4 calls, $0.39, 107k cache read per call | 6 calls, about $0.08, 2.5k cache read per call | both fixed it; ours also ran the gate |
+| Five-turn conversation, Sonnet 4.5 | 17 calls, 222 s, $0.66 | 24 calls, 196 s, about $0.33 | equal answers; ours 7 extra calls in one turn from self-verification |
+| Nine-minute feature, Sonnet 5 | 66 calls, 540 s, $2.23, 3 unrelated files edited | 81 to 90 calls, 458 to 561 s, $2.27 to $3.03, in scope | both complete and green; cost within noise |
+
+Defects found by these tests, all fixed: child stdin inheritance hang; TOML key ordering; one-shot approvals blocking; console encoding; shell containment on interpreter paths; `::` and `./` false positives; `2>&1` treated as a write; lint path unquoted in bash; provider-error log key collision; adaptive thinking; interpreter not on PATH; prompts swallowed at approval; bare `[stderr]` rendering.
+
+## 19. Changelog
+
+- 0.3, 2026-09-16: implementation status and roadmap added; rules for compound commands, stderr redirects and shell containment; environment block names interpreter and verify commands; terminal pending-input queue. Nine live-found defects fixed.
 - 0.2, 2026-09-16: terminal client with approval prompts; session-scoped rules and mode changes recorded in the log and replayed on resume; deny-with-message reaches the model; gateway streams text deltas to clients.
 - 0.1, 2026-09-16: first consolidated spec from the five explainer pages and the model-layer study.
