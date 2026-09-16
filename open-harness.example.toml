@@ -1,0 +1,36 @@
+# Copy to open-harness.toml in your project, or ~/.open-harness/config.toml
+# Top-level keys must appear before the first [table] (TOML rule).
+max_turns = 50
+max_output_tokens = 8192
+# session_root = "C:/path/to/sessions"
+
+[providers.anthropic]
+adapter = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+
+[providers.openai]
+adapter = "openai-compatible"
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+
+[providers.local]
+adapter = "openai-compatible"
+base_url = "http://localhost:11434/v1"      # Ollama
+
+[roles]
+main      = "anthropic:claude-sonnet-4-5"
+compactor = "anthropic:claude-haiku-4-5"
+# explore    = "local:qwen3-coder"          # unbound roles inherit from main
+# fallback   = "openai:gpt-5-mini"
+
+[policy]
+mode  = "default"                            # default | accept_edits | plan | bypass | dont_ask
+allow = ["read", "grep", "glob", "shell(git status*)", "shell(git diff*)", "shell(ls*)",
+         "shell(pytest*)", "shell(python -m pytest*)"]   # let the model run the project's own tests
+deny  = ["read(~/.ssh/**)", "shell(rm -rf*)"]
+ask   = ["shell(git push*)"]
+
+[verify]
+lint = "ruff check {file}"                   # run after every edit; only errors are shown to the model
+test = "pytest -q"                           # must pass before a turn may end
+

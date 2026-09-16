@@ -1,0 +1,37 @@
+[project]
+name = "open-harness"
+version = "0.1.0"
+description = "A small agent harness: stateless kernel, append-only event log, vendor-neutral model layer, verified turn ends."
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40",
+    "openai>=1.50",
+    "httpx>=0.27",
+    "pydantic>=2.6",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5"]
+
+[project.scripts]
+open-harness = "open_harness.clients.stdio:main"
+
+[project.entry-points."open_harness.adapters"]
+anthropic = "open_harness.model.adapters.anthropic:AnthropicAdapter"
+openai-compatible = "open_harness.model.adapters.openai_compatible:OpenAICompatibleAdapter"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["open_harness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
